@@ -168,6 +168,10 @@ class SchedulerUtil:
                 for item in job_list:
                     cls.remove_job(job_id=item.id)  # 删除旧任务
                     cls.add_job(item)
+                    # 根据数据库中保存的状态来设置任务状态
+                    if hasattr(item, 'status') and item.status is False:
+                        # 如果任务状态为暂停，则立即暂停刚添加的任务
+                        cls.pause_job(job_id=item.id)
         scheduler.add_listener(cls.scheduler_event_listener, EVENT_ALL)
         logger.info('✅️ 系统初始定时任务加载成功')
 
@@ -359,65 +363,94 @@ class SchedulerUtil:
     def pause_job(cls, job_id: Union[str, int]):
         """
         暂停指定任务（仅运行中可暂停，已终止不可）。
-    
+
         参数:
         - job_id (str | int): 任务ID。
-    
+
         返回:
         - None
-    
+
         异常:
         - ValueError: 当任务不存在时抛出。
         """
-        logger.info(f"开始获取全部任务：{cls.get_all_jobs()}， 状态： {cls.get_job_status()}")
         query_job = cls.get_job(job_id=str(job_id))
         if not query_job:
             raise ValueError(f"未找到该任务：{job_id}")
         scheduler.pause_job(job_id=str(job_id))
-        logger.info(f"查看获取全部任务：{cls.get_all_jobs()}， 状态： {cls.get_job_status()}")
 
     @classmethod
     def resume_job(cls, job_id: Union[str, int]):
         """
         恢复指定任务（仅暂停中可恢复，已终止不可）。
-    
+
         参数:
         - job_id (str | int): 任务ID。
-    
+
         返回:
         - None
-    
+
         异常:
         - ValueError: 当任务不存在时抛出。
         """
-        
-        logger.info(f"开始获取全部任务：{cls.get_all_jobs()}， 状态： {cls.get_job_status()}")
         query_job = cls.get_job(job_id=str(job_id))
         if not query_job:
             raise ValueError(f"未找到该任务：{job_id}")
         scheduler.resume_job(job_id=str(job_id))
-        logger.info(f"查看获取全部任务：{cls.get_all_jobs()}， 状态： {cls.get_job_status()}")
 
     @classmethod
-    def reschedule_job(cls, job_id: Union[str, int]) -> Optional[Job]:
+    def reschedule_job(cls, job_id: Union[str, int], trigger=None, **trigger_args) -> Optional[Job]:
         """
         重启指定任务的触发器。
-    
+
         参数:
         - job_id (str | int): 任务ID。
-    
+        - trigger: 触发器类型
+        - **trigger_args: 触发器参数
+
         返回:
-        - None
-    
+        - Job: 更新后的任务对象
+
         异常:
         - CustomException: 当任务不存在时抛出。
         """
-        logger.info(f"开始获取全部任务：{cls.get_all_jobs()}， 状态： {cls.get_job_status()}")
         query_job = cls.get_job(job_id=str(job_id))
         if not query_job:
             raise CustomException(msg=f"未找到该任务：{job_id}")
-        scheduler.reschedule_job(job_id=str(job_id))
-        logger.info(f"查看获取全部任务：{cls.get_all_jobs()}， 状态： {cls.get_job_status()}")
+        
+        # 如果没有提供新的触发器，则使用现有触发器
+        if trigger is None:
+            # 获取当前任务的触发器配置
+            current_trigger = query_job.trigger
+            # 重新调度任务，使用当前的触发器
+            return scheduler.reschedule_job(job_id=str(job_id), trigger=current_trigger)
+        else:
+            # 使用新提供的触发器
+            return scheduler.reschedule_job(job_id=str(job_id), trigger=trigger, **trigger_args)
+    
+    @classmethod
+    def get_single_job_status(cls, job_id: Union[str, int]) -> str:
+        """
+        获取单个任务的当前状态。
+
+        参数:
+        - job_id (str | int): 任务ID
+
+        返回:
+        - str: 任务状态（'running' | 'paused' | 'stopped' | 'unknown'）
+        """
+        job = cls.get_job(job_id=str(job_id))
+        if not job:
+            return 'unknown'
+        
+        # 检查任务是否在暂停列表中
+        if job_id in scheduler._jobstores[job._jobstore_alias]._paused_jobs:
+            return 'paused'
+        
+        # 检查调度器状态
+        if scheduler.state == 0:  # STATE_STOPPED
+            return 'stopped'
+        
+        return 'running'
 
     @classmethod
     def export_jobs(cls):

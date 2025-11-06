@@ -10,6 +10,7 @@ from sqlglot import parse as sqlglot_parse
 
 from app.config.setting import settings
 from app.core.logger import logger
+from app.common.response import ErrorResponse
 from app.core.exceptions import CustomException
 from app.api.v1.module_system.auth.schema import AuthSchema
 from app.utils.gen_util import GenUtils
@@ -126,16 +127,20 @@ class GenTableService:
                     
                     # 为每个字段初始化并保存到数据库
                     for column in gen_table_columns:
-                        # 将GenTableColumnOutSchema转换为GenTableColumnSchema，确保is_*字段为字符串格式
+                        # 将GenTableColumnOutSchema转换为GenTableColumnSchema，确保所有字段正确设置
                         column_schema = GenTableColumnSchema(
                             table_id=table.id,
                             column_name=column.column_name,
                             column_comment=column.column_comment,
                             column_type=column.column_type,
-                            # 确保这些字段为字符串格式，'1'表示true，'0'表示false
+                            column_length=column.column_length if column.column_length is not None else '',
+                            column_default=column.column_default if column.column_default is not None else '',
+                            python_type=column.python_type,
+                            python_field=column.python_field,
                             is_pk=str(column.is_pk) if column.is_pk is not None else '0',
                             is_increment=str(column.is_increment) if column.is_increment is not None else '0',
                             is_required=str(column.is_required) if column.is_required is not None else '0',
+                            is_unique=str(column.is_unique) if column.is_unique is not None else '0',
                             sort=column.sort
                         )
                         # 初始化字段属性
@@ -151,26 +156,51 @@ class GenTableService:
     async def create_table_service(cls, auth: AuthSchema, sql: str) -> Literal[True] | None:
         """创建表结构并导入至代码生成模块。
         - 校验：使用`sqlglot`确保仅包含`CREATE TABLE`语句；失败抛出明确异常。
+        - 唯一性检查：在创建前检查该表是否已存在于数据库中。
         """
         # 验证SQL非空
         if not sql or not sql.strip():
             raise CustomException(msg='SQL语句不能为空')
             
         try:
+            # 解析SQL语句
             sql_statements = sqlglot_parse(sql, dialect=settings.DATABASE_TYPE)
+            
             # 校验sql语句是否为合法的建表语句
             if not cls.__is_valid_create_table(sql_statements):
                 raise CustomException(msg='sql语句不是合法的建表语句')
+            
+            # 获取要创建的表名
             table_names = cls.__get_table_names(sql_statements)
-            # 执行SQL语句创建表
-            result = await GenTableCRUD(auth=auth).create_table_by_sql(sql)
-            if not result:
-                raise CustomException(msg='创建表失败，请检查SQL语句，请确保语法是否符合标准，并检查后端日志')
+            if not table_names:
+                raise CustomException(msg='无法从SQL语句中提取表名')
+            
+            # 创建CRUD实例
+            gen_table_crud = GenTableCRUD(auth=auth)
+            
+            # 检查每个表是否已存在
+            for table_name in table_names:
+                # 检查数据库中是否已存在该表
+                if await gen_table_crud.check_table_exists(table_name):
+                    raise CustomException(msg=f'表 {table_name} 已存在，请检查并修改表名后重试')
+                
+                # 检查代码生成模块中是否已导入该表
+                existing_table = await gen_table_crud.get_gen_table_by_name(table_name)
+                if existing_table:
+                    raise CustomException(msg=f'表 {table_name} 已在代码生成模块中存在，请检查并修改表名后重试')
+            
+            # 表不存在，执行SQL语句创建表
+            await gen_table_crud.create_table_by_sql(sql)
+            
+            # 导入表结构到代码生成模块
             gen_table_list = await cls.get_gen_db_table_list_by_name_service(auth, table_names)
             import_result = await cls.import_gen_table_service(auth, gen_table_list)
             return import_result
+        except CustomException:
+            # 直接传递已格式化的CustomException
+            raise
         except Exception as e:
-            raise CustomException(msg=f'创建表结构失败: {str(e)}')
+            raise CustomException(msg=f'创建表结构失败: {str(e)}。SQL预览: {sql}')
     
     @classmethod
     def __is_valid_create_table(cls, sql_statements: List[Expression | None]) -> bool:
@@ -397,6 +427,11 @@ class GenTableService:
             for column in db_table_columns:
                 # 仅在缺省时初始化默认属性（包含 table_id 关联）
                 GenUtils.init_column_field(column, table)
+                # 确保column_length和column_default字段有默认值
+                if column.column_length is None:
+                    column.column_length = ''
+                if column.column_default is None:
+                    column.column_default = ''
                 if column.column_name in table_column_map:
                     prev_column = table_column_map[column.column_name]
                     # 复用旧记录ID，确保执行更新
@@ -418,6 +453,12 @@ class GenTableService:
                     is_pk_bool = bool(getattr(prev_column, 'pk', False)) or (prev_column.is_pk == '1')
                     if not is_pk_bool:
                         column.is_required = keep_str(prev_column.is_required, column.is_required)
+                    column.column_length = keep_str(prev_column.column_length, column.column_length)
+                    column.column_default = keep_str(prev_column.column_default, column.column_default)
+                    column.python_type = keep_str(prev_column.python_type, column.python_type)
+                    column.python_field = keep_str(prev_column.python_field, column.python_field)
+                    column.is_pk = keep_str(prev_column.is_pk, column.is_pk)
+                    column.is_increment = keep_str(prev_column.is_increment, column.is_increment)
                     column.is_unique = keep_str(prev_column.is_unique, column.is_unique)
                     column.is_insert = keep_str(prev_column.is_insert, column.is_insert)
                     column.is_edit = keep_str(prev_column.is_edit, column.is_edit)
@@ -533,6 +574,7 @@ class GenTableColumnService:
                     gen_table_column.is_list = str(gen_table_column.is_list)
                 if hasattr(gen_table_column, 'is_query') and gen_table_column.is_query is not None and not isinstance(gen_table_column.is_query, str):
                     gen_table_column.is_query = str(gen_table_column.is_query)
+                
                 
                 # 转换为输出模型
                 column_out = GenTableColumnOutSchema.model_validate(gen_table_column)

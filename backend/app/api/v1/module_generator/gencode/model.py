@@ -49,6 +49,8 @@ class GenTableColumnModel(CreatorMixin):
     column_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, comment='列名称')
     column_comment: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, comment='列描述')
     column_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment='列类型')
+    column_length: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment='列长度')
+    column_default: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, comment='列默认值')
     python_type: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, comment='PYTHON类型')
     python_field: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, comment='PYTHON字段名')
     is_pk: Mapped[Optional[str]] = mapped_column(String(1), nullable=True, comment='是否主键（1是）')

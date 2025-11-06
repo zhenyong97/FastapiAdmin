@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 设置全局变量
-PROJECT_NAME="fastapiadmin"
+PROJECT_NAME="FastapiAdmin"
 WORK_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_PATH="${WORK_DIR}/${PROJECT_NAME}"
 GIT_REPO="https://gitee.com/tao__tao/${PROJECT_NAME}.git"

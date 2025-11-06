@@ -321,6 +321,35 @@ class GenTableCRUD(CRUDBase[GenTableModel, GenTableSchema, GenTableSchema]):
                 dict_data.append(dict_row)
         return dict_data
 
+    async def check_table_exists(self, table_name: str) -> bool:
+        """
+        检查数据库中是否已存在指定表名的表。
+        
+        参数:
+        - table_name (str): 要检查的表名。
+        
+        返回:
+        - bool: 如果表存在返回True，否则返回False。
+        """
+        try:
+            # 根据不同数据库类型使用不同的查询方式
+            if settings.DATABASE_TYPE.lower() == 'mysql':
+                query = text("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :table_name")
+            elif settings.DATABASE_TYPE.lower() == 'postgresql':
+                query = text("SELECT 1 FROM pg_tables WHERE tablename = :table_name")
+            elif settings.DATABASE_TYPE.lower() == 'sqlite':
+                query = text("SELECT name FROM sqlite_master WHERE type='table' AND name = :table_name")
+            else:
+                # 默认查询方式
+                query = text("SELECT 1 FROM information_schema.tables WHERE table_name = :table_name")
+            
+            result = await self.db.execute(query, {"table_name": table_name})
+            return result.scalar() is not None
+        except Exception as e:
+            logger.error(f"检查表格存在性时发生错误: {e}")
+            # 出错时返回False，避免误报表已存在
+            return False
+            
     async def create_table_by_sql(self, sql: str) -> bool:
         """
         根据SQL语句创建表结构。
@@ -332,14 +361,11 @@ class GenTableCRUD(CRUDBase[GenTableModel, GenTableSchema, GenTableSchema]):
         - bool: 是否创建成功。
         """
         try:
+            # 执行SQL但不手动提交事务，由框架管理事务生命周期
             await self.db.execute(text(sql))
-            # 提交事务
-            await self.db.commit()
             await self.db.flush()
             return True
         except Exception as e:
-            # 如果发生异常，回滚事务
-            await self.db.rollback()
             logger.error(f"创建表时发生错误: {e}")
             return False
 
@@ -415,10 +441,13 @@ class GenTableColumnCRUD(CRUDBase[GenTableColumnModel, GenTableColumnSchema, Gen
                     c.column_name,
                     (CASE WHEN (c.is_nullable = 'NO' AND (tc.constraint_type IS DISTINCT FROM 'PRIMARY KEY')) THEN '1' ELSE '0' END) AS is_required,
                     (CASE WHEN (tc.constraint_type = 'PRIMARY KEY') THEN '1' ELSE '0' END) AS is_pk,
+                    (CASE WHEN EXISTS (SELECT 1 FROM information_schema.table_constraints uc JOIN information_schema.key_column_usage kcu ON uc.constraint_name = kcu.constraint_name WHERE uc.table_name = c.table_name AND uc.table_schema = c.table_schema AND uc.constraint_type = 'UNIQUE' AND kcu.column_name = c.column_name) THEN '1' ELSE '0' END) AS is_unique,
                     c.ordinal_position AS sort,
                     COALESCE(pgd.description, '') AS column_comment,
                     (CASE WHEN c.column_default LIKE 'nextval%' THEN '1' ELSE '0' END) AS is_increment,
-                    c.udt_name AS column_type
+                    c.udt_name AS column_type,
+                    c.character_maximum_length AS column_length,
+                    c.column_default AS column_default
                 FROM information_schema.columns c
                 LEFT JOIN information_schema.key_column_usage kcu
                   ON c.table_name = kcu.table_name AND c.column_name = kcu.column_name AND kcu.table_schema = c.table_schema
@@ -436,19 +465,22 @@ class GenTableColumnCRUD(CRUDBase[GenTableColumnModel, GenTableColumnSchema, Gen
         elif settings.DATABASE_TYPE == "mysql":
             query_sql = """
                 SELECT
-                    column_name,
-                    (CASE WHEN (is_nullable = 'no' AND column_key != 'PRI') THEN '1' ELSE '0' END) AS is_required,
-                    (CASE WHEN column_key = 'PRI' THEN '1' ELSE '0' END) AS is_pk,
-                    ordinal_position AS sort,
-                    column_comment,
-                    (CASE WHEN extra = 'auto_increment' THEN '1' ELSE '0' end) AS is_increment,
-                    column_type
+                    c.column_name,
+                    (CASE WHEN (c.is_nullable = 'NO' AND c.column_key != 'PRI') THEN '1' ELSE '0' END) AS is_required,
+                    (CASE WHEN c.column_key = 'PRI' THEN '1' ELSE '0' END) AS is_pk,
+                    (CASE WHEN EXISTS (SELECT 1 FROM information_schema.statistics s WHERE s.table_schema = c.table_schema AND s.table_name = c.table_name AND s.column_name = c.column_name AND s.non_unique = 0 AND s.index_name != 'PRIMARY') THEN '1' ELSE '0' END) AS is_unique,
+                    c.ordinal_position AS sort,
+                    c.column_comment,
+                    (CASE WHEN c.extra = 'auto_increment' THEN '1' ELSE '0' end) AS is_increment,
+                    c.column_type,
+                    c.character_maximum_length AS column_length,
+                    c.column_default AS column_default
                 FROM 
-                    information_schema.columns
+                    information_schema.columns c
                 WHERE 
-                    table_schema = (SELECT DATABASE())
-                    AND table_name = :table_name
-                ORDER BY ordinal_position
+                    c.table_schema = (SELECT DATABASE())
+                    AND c.table_name = :table_name
+                ORDER BY c.ordinal_position
             """
         else:
             # 修复SQLite查询语句，使用PRAGMA获取表结构信息
@@ -457,10 +489,13 @@ class GenTableColumnCRUD(CRUDBase[GenTableColumnModel, GenTableColumnSchema, Gen
                     name as column_name,
                     (CASE WHEN (type != '' AND pk != 1) THEN '1' ELSE '0' END) AS is_required,
                     (CASE WHEN pk = 1 THEN '1' ELSE '0' END) AS is_pk,
+                    (CASE WHEN (SELECT COUNT(*) FROM pragma_index_list(:table_name) pil JOIN pragma_index_info(pil.name) pii ON 1=1 WHERE pil.unique = 1 AND pii.name = pragma_table_info.name AND pil.name NOT LIKE 'sqlite_%') > 0 THEN '1' ELSE '0' END) AS is_unique,
                     cid AS sort,
                     '' as column_comment,
                     (CASE WHEN type LIKE '%AUTOINCREMENT%' THEN '1' ELSE '0' END) AS is_increment,
-                    type as column_type
+                    type as column_type,
+                    (CASE WHEN type LIKE 'varchar(%' OR type LIKE 'char(%' THEN substr(type, instr(type, '(') + 1, instr(type, ')') - instr(type, '(') - 1) ELSE NULL END) AS column_length,
+                    dflt_value AS column_default
                 FROM 
                     pragma_table_info(:table_name)
                 ORDER BY cid
@@ -473,10 +508,13 @@ class GenTableColumnCRUD(CRUDBase[GenTableColumnModel, GenTableColumnSchema, Gen
                 column_name=row[0],
                 is_required=row[1],
                 is_pk=row[2],
-                sort=row[3],
-                column_comment=row[4],
-                is_increment=row[5],
-                column_type=row[6]
+                is_unique=row[3],
+                sort=row[4],
+                column_comment=row[5],
+                is_increment=row[6],
+                column_type=row[7],
+                column_length=str(row[8]) if row[8] is not None else None,
+                column_default=str(row[9]) if row[9] is not None else None
             )
             for row in rows
         ]

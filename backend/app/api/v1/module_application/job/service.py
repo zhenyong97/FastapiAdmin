@@ -149,9 +149,16 @@ class JobService:
         elif option == 2:
             SchedulerUtil().resume_job(job_id=id)
             await JobCRUD(auth).set_obj_field_crud(ids=[id], status=True)
-        # elif option == 3:
-        #     SchedulerUtil().reschedule_job(job_id=id)
-        #     await JobCRUD(auth).set_obj_field_crud(ids=[id], status=False)
+        elif option == 3:
+            # 重启任务：先移除再添加，确保使用最新的任务配置
+            SchedulerUtil.remove_job(job_id=id)
+            # 获取最新的任务配置
+            updated_job = await JobCRUD(auth).get_obj_by_id_crud(id=id)
+            if updated_job:
+                # 重新添加任务
+                SchedulerUtil.add_job(job_info=updated_job)
+                # 设置状态为运行中
+                await JobCRUD(auth).set_obj_field_crud(ids=[id], status=True)
 
     @classmethod
     async def export_job_service(cls, data_list: List[Dict[str, Any]]) -> bytes:

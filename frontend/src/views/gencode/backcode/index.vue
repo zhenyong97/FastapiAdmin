@@ -274,15 +274,23 @@
             border 
             stripe
           >
-            <el-table-column label="序号" type="index" min-width="5%"/>
-            <el-table-column label="字段列名" prop="column_name" min-width="10%" :show-overflow-tooltip="true"/>
-            <el-table-column label="字段注释" min-width="10%">
+            <template #empty>
+              <el-empty :image-size="80" description="暂无数据" />
+            </template>
+            <el-table-column label="序号" type="index" min-width="5%" fixed />
+            <el-table-column label="列名" prop="column_name" min-width="10%" :show-overflow-tooltip="true"/>
+            <el-table-column label="类型" prop="column_type" min-width="10%" :show-overflow-tooltip="true"/>
+            <el-table-column label="长度" prop="column_length" min-width="8%" :show-overflow-tooltip="true">
+              <template #default="scope">
+                <el-input v-model="scope.row.column_length" :disabled="scope.row.is_pk === '1'"/>
+              </template>
+            </el-table-column>
+            <el-table-column label="注释" min-width="10%" >
               <template #default="scope">
                 <el-input v-model="scope.row.column_comment"></el-input>
               </template>
             </el-table-column>
-            <el-table-column label="列类型" prop="column_type" min-width="10%" :show-overflow-tooltip="true"/>
-            <el-table-column label="python类型" min-width="11%">
+            <el-table-column label="后端类型" min-width="12%">
               <template #default="scope">
                 <el-select v-model="scope.row.python_type">
                   <el-option label="str" value="str" />
@@ -298,32 +306,32 @@
                 </el-select>
               </template>
             </el-table-column>
-            <el-table-column label="python属性" min-width="10%">
+            <el-table-column label="后端属性" min-width="12%">
               <template #default="scope">
                 <el-input v-model="scope.row.python_field"></el-input>
               </template>
             </el-table-column>
-            <el-table-column label="新增" min-width="5%">
+            <el-table-column label="新增" min-width="10%">
               <template #default="scope">
                 <el-checkbox v-model="scope.row.is_insert" true-value="1" false-value="0"></el-checkbox>
               </template>
             </el-table-column>
-            <el-table-column label="编辑" min-width="5%">
+            <el-table-column label="编辑" min-width="10%">
               <template #default="scope">
                 <el-checkbox v-model="scope.row.is_edit" true-value="1" false-value="0"></el-checkbox>
               </template>
             </el-table-column>
-            <el-table-column label="列表" min-width="5%">
+            <el-table-column label="列表" min-width="10%">
               <template #default="scope">
                 <el-checkbox v-model="scope.row.is_list" true-value="1" false-value="0"></el-checkbox>
               </template>
             </el-table-column>
-            <el-table-column label="查询" min-width="5%">
+            <el-table-column label="查询" min-width="10%">
               <template #default="scope">
                 <el-checkbox v-model="scope.row.is_query" true-value="1" false-value="0"></el-checkbox>
               </template>
             </el-table-column>
-            <el-table-column label="查询方式" min-width="10%">
+            <el-table-column label="查询方式" min-width="12%">
               <template #default="scope">
                 <el-select v-model="scope.row.query_type">
                   <el-option label="=" value="EQ" />
@@ -337,12 +345,22 @@
                 </el-select>
               </template>
             </el-table-column>
-            <el-table-column label="必填" min-width="5%">
+            <el-table-column label="默认值" prop="column_default" min-width="10%" :show-overflow-tooltip="true">
+              <template #default="scope">
+                <el-input v-model="scope.row.column_default" :disabled="scope.row.is_pk === '1'"/>
+              </template>
+            </el-table-column>
+            <el-table-column label="自增" min-width="10%">
+              <template #default="scope">
+                <el-checkbox v-model="scope.row.is_increment" true-value="1" false-value="0" />
+              </template>
+            </el-table-column>
+            <el-table-column label="必填" min-width="10%">
               <template #default="scope">
                 <el-checkbox v-model="scope.row.is_required" true-value="1" false-value="0"></el-checkbox>
               </template>
             </el-table-column>
-            <el-table-column label="唯一" min-width="5%">
+            <el-table-column label="唯一" min-width="10%">
               <template #default="scope">
                 <el-checkbox v-model="scope.row.is_unique" true-value="1" false-value="0"></el-checkbox>
               </template>
@@ -362,7 +380,7 @@
                 </el-select>
               </template>
             </el-table-column>
-            <el-table-column label="字典类型" min-width="12%">
+            <el-table-column label="字典类型" min-width="12%" fixed="right">
               <template #default="scope">
                 <el-select v-model="scope.row.dict_type" clearable filterable placeholder="请选择">
                   <el-option
@@ -1075,16 +1093,13 @@ async function handleCreateTable(sql: string): Promise<void> {
   
   loading.value = true;
   try {
-    const response = await GencodeAPI.createTable(sql);
-    if (response?.data?.code === 200) {
-      ElMessage.success('创建表成功');
-      createTableVisible.value = false;
-      loadingData(); // 创建成功后刷新列表
-    }
+    await GencodeAPI.createTable(sql);
+    createTableVisible.value = false;
+    createContent.value = '';
+    loadingData();
   } catch (error) {
     console.error('创建表数据失败:', error);
   } finally {
-    createContent.value = '';
     loading.value = false;
   }
 }

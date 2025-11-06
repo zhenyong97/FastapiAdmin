@@ -84,6 +84,8 @@ class GenTableColumnSchema(BaseModel):
     column_name: Optional[str] = Field(default=None, description='列名称')
     column_comment: Optional[str] = Field(default=None, description='列描述')
     column_type: Optional[str] = Field(default=None, description='列类型')
+    column_length: Optional[str] = Field(default=None, description='列长度')
+    column_default: Optional[str] = Field(default=None, description='列默认值')
     python_type: Optional[str] = Field(default=None, description='python类型')
     python_field: Optional[str] = Field(default=None, description='python字段名')
     is_pk: Optional[str] = Field(default=None, description='是否主键（1是）')

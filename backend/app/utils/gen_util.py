@@ -59,11 +59,19 @@ class GenUtils:
             column.is_increment = '1' if bool(column.is_increment) else '0'
         if column.is_required is not None and not isinstance(column.is_required, str):
             column.is_required = '1' if bool(column.is_required) else '0'
+        if column.is_unique is not None and not isinstance(column.is_unique, str):
+            column.is_unique = '1' if bool(column.is_unique) else '0'
         
         # 确保None值默认为'0'
         column.is_pk = column.is_pk or '0'
         column.is_increment = column.is_increment or '0'
         column.is_required = column.is_required or '0'
+        column.is_unique = column.is_unique or '0'
+        # 确保column_length和column_default字段有默认值
+        if column.column_length is None:
+            column.column_length = ''
+        if column.column_default is None:
+            column.column_default = ''
 
         if column.html_type is None:
             if cls.arrays_contains(GenConstant.COLUMNTYPE_STR, data_type) or cls.arrays_contains(
@@ -98,8 +106,8 @@ class GenUtils:
         if column.is_insert is None:
             column.is_insert = GenConstant.REQUIRE
         else:
-            # 确保is_insert为字符串格式
-            column.is_insert = str(column.is_insert) if column.is_insert is not None else '0'
+            # 确保is_insert为字符串格式，并且值为'0'或'1'
+            column.is_insert = '1' if (column.is_insert is True or str(column.is_insert).lower() in ('1', 'true', 'yes')) else '0'
             
         # 只有当is_edit为None时才设置编辑字段
         if column.is_edit is None:
@@ -108,8 +116,8 @@ class GenUtils:
             else:
                 column.is_edit = '0'
         else:
-            # 确保is_edit为字符串格式
-            column.is_edit = str(column.is_edit) if column.is_edit is not None else '0'
+            # 确保is_edit为字符串格式，并且值为'0'或'1'
+            column.is_edit = '1' if (column.is_edit is True or str(column.is_edit).lower() in ('1', 'true', 'yes')) else '0'
             
         # 只有当is_list为None时才设置列表字段
         if column.is_list is None:
@@ -118,8 +126,8 @@ class GenUtils:
             else:
                 column.is_list = '0'
         else:
-            # 确保is_list为字符串格式
-            column.is_list = str(column.is_list) if column.is_list is not None else '0'
+            # 确保is_list为字符串格式，并且值为'0'或'1'
+            column.is_list = '1' if (column.is_list is True or str(column.is_list).lower() in ('1', 'true', 'yes')) else '0'
             
         # 只有当is_query为None时才设置查询字段
         if column.is_query is None:
@@ -128,8 +136,8 @@ class GenUtils:
             else:
                 column.is_query = '0'
         else:
-            # 确保is_query为字符串格式
-            column.is_query = str(column.is_query) if column.is_query is not None else '0'
+            # 确保is_query为字符串格式，并且值为'0'或'1'
+            column.is_query = '1' if (column.is_query is True or str(column.is_query).lower() in ('1', 'true', 'yes')) else '0'
 
     @classmethod
     def arrays_contains(cls, arr: List[str], target_value: str) -> bool:

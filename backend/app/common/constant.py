@@ -411,6 +411,8 @@ class GenConstant:
         'float',
         'double',
         'decimal',
+        'boolean',
+        'bool'
     ]
     # 页面不需要显示的添加字段
     COLUMNNAME_NOT_ADD_SHOW = ['created_at', 'updated_at']

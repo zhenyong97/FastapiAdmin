@@ -209,6 +209,10 @@ export interface GenTableColumnSchema {
   column_comment?: string;
   /** 列类型 */
   column_type?: string;
+  /** 列长度 */
+  column_length?: string;
+  /** 列默认值 */
+  column_default?: string;
   /** PYTHON类型 */
   python_type?: string;
   /** PYTHON字段名 */
