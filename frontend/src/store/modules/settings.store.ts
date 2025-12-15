@@ -13,6 +13,7 @@ interface SettingsState {
   showWatermark: boolean;
   showSettings: boolean;
   showGuide: boolean; // 引导功能开关
+  enableAiAssistant: boolean;
 
   // 桌面端工具显示设置
   showMenuSearch: boolean;
@@ -44,14 +45,25 @@ export const useSettingsStore = defineStore("setting", () => {
     defaultSettings.showTagsView
   );
   const showAppLogo = useStorage<boolean>(SETTINGS_KEYS.SHOW_APP_LOGO, defaultSettings.showAppLogo);
+  // 是否显示水印
   const showWatermark = useStorage<boolean>(
     SETTINGS_KEYS.SHOW_WATERMARK,
     defaultSettings.showWatermark
   );
+
+  // 是否启用 AI 助手
+  const enableAiAssistant = useStorage<boolean>(
+    "vea:ui:enable_ai_assistant",
+    defaultSettings.enableAiAssistant
+  );
+
+  // 是否显示系统设置
   const showSettings = useStorage<boolean>(
     SETTINGS_KEYS.SHOW_SETTINGS,
     defaultSettings.showSettings
   );
+
+  // 是否显示引导功能
   const showGuide = useStorage<boolean>(SETTINGS_KEYS.SHOW_GUIDE, defaultSettings.showGuide); // 引导功能开关
 
   // 🎯 桌面端工具设置 - 持久化
@@ -59,18 +71,26 @@ export const useSettingsStore = defineStore("setting", () => {
     SETTINGS_KEYS.SHOW_MENU_SEARCH,
     defaultSettings.showMenuSearch
   );
+
+  // 是否显示全屏切换
   const showFullscreen = useStorage<boolean>(
     SETTINGS_KEYS.SHOW_FULLSCREEN,
     defaultSettings.showFullscreen
   );
+
+  // 是否显示布局大小选择
   const showSizeSelect = useStorage<boolean>(
     SETTINGS_KEYS.SHOW_SIZE_SELECT,
     defaultSettings.showSizeSelect
   );
+
+  // 是否显示语言选择
   const showLangSelect = useStorage<boolean>(
     SETTINGS_KEYS.SHOW_LANG_SELECT,
     defaultSettings.showLangSelect
   );
+
+  // 是否显示通知
   const showNotification = useStorage<boolean>(
     SETTINGS_KEYS.SHOW_NOTIFICATION,
     defaultSettings.showNotification
@@ -81,8 +101,12 @@ export const useSettingsStore = defineStore("setting", () => {
     SETTINGS_KEYS.SIDEBAR_COLOR_SCHEME,
     defaultSettings.sidebarColorScheme
   );
+
+  // 布局设置
   const layout = useStorage<LayoutMode>(SETTINGS_KEYS.LAYOUT, defaultSettings.layout as LayoutMode);
+  // 主题颜色
   const themeColor = useStorage<string>(SETTINGS_KEYS.THEME_COLOR, defaultSettings.themeColor);
+  // 主题模式
   const theme = useStorage<ThemeMode>(SETTINGS_KEYS.THEME, defaultSettings.theme);
 
   // 🎯 设置项映射
@@ -99,6 +123,7 @@ export const useSettingsStore = defineStore("setting", () => {
     showNotification,
     sidebarColorScheme,
     layout,
+    enableAiAssistant,
   } as const;
 
   // 🎯 监听器 - 主题变化
@@ -134,14 +159,17 @@ export const useSettingsStore = defineStore("setting", () => {
     theme.value = newTheme;
   }
 
+  // 更新主题颜色
   function updateThemeColor(newColor: string): void {
     themeColor.value = newColor;
   }
 
+  // 更新侧边栏配色方案
   function updateSidebarColorScheme(newScheme: string): void {
     sidebarColorScheme.value = newScheme;
   }
 
+  // 更新布局
   function updateLayout(newLayout: LayoutMode): void {
     layout.value = newLayout;
   }
@@ -151,10 +179,12 @@ export const useSettingsStore = defineStore("setting", () => {
     settingsVisible.value = !settingsVisible.value;
   }
 
+  // 显示设置面板
   function showSettingsPanel(): void {
     settingsVisible.value = true;
   }
 
+  // 隐藏设置面板
   function hideSettingsPanel(): void {
     settingsVisible.value = false;
   }
@@ -167,6 +197,7 @@ export const useSettingsStore = defineStore("setting", () => {
     showWatermark.value = defaultSettings.showWatermark;
     showSettings.value = defaultSettings.showSettings;
     showGuide.value = defaultSettings.showGuide;
+    enableAiAssistant.value = defaultSettings.enableAiAssistant;
 
     // 桌面端工具设置
     showMenuSearch.value = defaultSettings.showMenuSearch;
@@ -192,6 +223,7 @@ export const useSettingsStore = defineStore("setting", () => {
     showWatermark,
     showSettings,
     showGuide,
+    enableAiAssistant,
 
     // 🎯 桌面端工具状态
     showMenuSearch,

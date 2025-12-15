@@ -38,22 +38,24 @@
 
       <!-- 验证码 -->
       <el-form-item v-if="captchaState.enable" prop="captcha">
-        <div flex>
+        <div flex items-center gap-10px>
           <el-input
             v-model.trim="loginForm.captcha"
             :placeholder="t('login.captchaCode')"
             clearable
+            style="width: 320px"
             @keyup.enter="handleLoginSubmit"
           >
             <template #prefix>
               <div class="i-svg:captcha" />
             </template>
           </el-input>
-          <div cursor-pointer flex-center ml-10px>
-            <el-icon v-if="codeLoading" class="is-loading">
+          <div cursor-pointer flex-center w-100px>
+            <el-icon v-if="codeLoading" class="is-loading" size="20">
               <Loading />
             </el-icon>
-            <el-image v-else object-cover :src="captchaState.img_base" @click="getCaptcha" />
+            <el-image v-else-if="captchaState.img_base" border-rd-4px object-cover :src="captchaState.img_base" @click="getCaptcha" />
+            <el-text v-else type="info" size="small">点击获取验证码</el-text>
           </div>
         </div>
       </el-form-item>

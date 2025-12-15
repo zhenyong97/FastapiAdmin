@@ -98,6 +98,8 @@ declare global {
     guideVisible: boolean;
     /** 是否启动引导 */
     showGuide: boolean;
+    /** 是否启用AI助手 */
+    enableAiAssistant: boolean;
   }
 
   /**

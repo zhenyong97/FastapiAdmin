@@ -102,8 +102,7 @@ const updateMenuState = (topMenuPath: string, skipNavigation = false) => {
   // 确保路径有效且不相同才更新，避免重复操作
   if (topMenuPath && appStore.activeTopMenuPath) {
     appStore.activeTopMenu(topMenuPath); // 设置激活的顶部菜单
-    // 只有当路由映射表中存在该路径时才更新侧边菜单
-    permissionStore.setMixLayoutSideMenus(topMenuPath); // 设置混合布局左侧菜单
+    permissionStore.setMixLayoutSideMenus(topMenuPath); // 只有当路由映射表中存在该路径时才更新侧边菜单。 设置混合布局左侧菜单
   }
 
   // 如果是点击菜单且状态已变更，才进行导航

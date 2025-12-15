@@ -1,5 +1,5 @@
 import vue from "@vitejs/plugin-vue";
-import { type ConfigEnv, loadEnv, defineConfig } from "vite";
+import { type ConfigEnv, type UserConfig, loadEnv, defineConfig } from "vite";
 
 import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
@@ -18,7 +18,7 @@ const __APP_INFO__ = {
 const pathSrc = resolve(__dirname, "src");
 
 // Vite配置  https://cn.vitejs.dev/config
-export default defineConfig(({ mode }: ConfigEnv) => {
+export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
   const env = loadEnv(mode, process.cwd());
   const isProduction = mode === "production";
 
